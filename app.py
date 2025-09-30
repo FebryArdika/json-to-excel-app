@@ -14,19 +14,23 @@ if uploaded_file is not None:
         # Load JSON
         data = json.load(uploaded_file)
 
-        # Convert to DataFrame
+        # Normalize JSON
         if isinstance(data, list):
-            df = pd.DataFrame(data)
-        elif isinstance(data, dict):
             df = pd.json_normalize(data)
+        elif isinstance(data, dict):
+            # Check if nested dict or list inside
+            if any(isinstance(v, (dict, list)) for v in data.values()):
+                df = pd.json_normalize(data)
+            else:
+                df = pd.DataFrame([data])
         else:
             st.error("Unsupported JSON structure.")
             st.stop()
 
-        st.success("✅ JSON loaded successfully!")
+        st.success("✅ JSON loaded and normalized!")
         st.dataframe(df)
 
-        # Convert to Excel in memory (no writer.save())
+        # Convert to Excel in memory
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Sheet1")
