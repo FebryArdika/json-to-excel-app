@@ -13,7 +13,7 @@ if uploaded_file is not None:
     try:
         # Load JSON
         data = json.load(uploaded_file)
-        
+
         # Convert to DataFrame
         if isinstance(data, list):
             df = pd.DataFrame(data)
@@ -26,17 +26,17 @@ if uploaded_file is not None:
         st.success("✅ JSON loaded successfully!")
         st.dataframe(df)
 
-        # Convert to Excel in memory
+        # Convert to Excel in memory (no writer.save())
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Sheet1")
-            writer.save()
-            st.download_button(
-                label="📥 Download as Excel",
-                data=buffer.getvalue(),
-                file_name="converted.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+
+        st.download_button(
+            label="📥 Download as Excel",
+            data=buffer.getvalue(),
+            file_name="converted.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     except Exception as e:
         st.error(f"❌ Error processing file: {e}")
