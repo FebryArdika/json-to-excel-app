@@ -1,46 +1,48 @@
 import streamlit as st
-import pandas as pd
+import csv
 import json
-from io import BytesIO
+import io
+import zipfile
 
-st.set_page_config(page_title="JSON to Excel Converter", layout="centered")
+st.title("Gabungkan Data JSON ke CSV")
 
-st.title("📝 JSON to Excel Converter")
+uploaded_files = st.file_uploader("Upload file JSON (boleh lebih dari satu)", type="json", accept_multiple_files=True)
 
-uploaded_file = st.file_uploader("Upload JSON file", type="json")
+if uploaded_files:
+    all_data = []
 
-if uploaded_file is not None:
-    try:
-        # Load JSON
-        data = json.load(uploaded_file)
+    for uploaded_file in uploaded_files:
+        try:
+            data = json.load(uploaded_file)
+            all_data.append(data)
+        except Exception as e:
+            st.warning(f"Gagal parsing {uploaded_file.name}: {e}")
 
-        # Normalize JSON
-        if isinstance(data, list):
-            df = pd.json_normalize(data)
-        elif isinstance(data, dict):
-            # Check if nested dict or list inside
-            if any(isinstance(v, (dict, list)) for v in data.values()):
-                df = pd.json_normalize(data)
-            else:
-                df = pd.DataFrame([data])
-        else:
-            st.error("Unsupported JSON structure.")
-            st.stop()
+    if all_data:
+        # Buat CSV di memori
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(("Cluster", "Date", "Min", "Mean", "Max", "MetrixName"))
 
-        st.success("✅ JSON loaded and normalized!")
-        st.dataframe(df)
+        for data in all_data:
+            for item in data.get("items", []):
+                for series in item.get("timeSeries", []):
+                    metric = series.get("metadata", {}).get("metricName", "")
+                    cluster = series.get("metadata", {}).get("attributes", {}).get("clusterName", "")
+                    for time in series.get("data", []):
+                        stats = time.get("aggregateStatistics", {})
+                        timestamp = time.get("timestamp", "")
+                        min_val = stats.get("min", "")
+                        mean_val = stats.get("mean", "")
+                        max_val = stats.get("max", "")
+                        writer.writerow((cluster, timestamp, min_val, mean_val, max_val, metric))
 
-        # Convert to Excel in memory
-        buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Sheet1")
+        # Konversi CSV ke downloadable file
+        st.success("Data berhasil diproses!")
 
         st.download_button(
-            label="📥 Download as Excel",
-            data=buffer.getvalue(),
-            file_name="converted.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="Download CSV",
+            data=output.getvalue(),
+            file_name="collected.csv",
+            mime="text/csv"
         )
-
-    except Exception as e:
-        st.error(f"❌ Error processing file: {e}")
